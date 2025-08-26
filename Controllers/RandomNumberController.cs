@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
+using RandomNumbersAPI.Models;
 namespace RandomNumbersAPI.Controllers
 {
     [Route("api/[controller]")]
@@ -18,7 +19,7 @@ namespace RandomNumbersAPI.Controllers
         [HttpGet("number/default")]
         public IActionResult GetRandomNumberDefault()
         {
-            int result = new Random().Next();
+            int result = _random.Next();
             return Ok(new { type = "integer", result });
         }
         //GET /randomnumber/number/range?min=10&max=50
@@ -29,7 +30,7 @@ namespace RandomNumbersAPI.Controllers
             {
                 return BadRequest( new{error = "El parámetro 'min' no puede ser mayor que 'max'." });
             }
-            int result = new Random().Next(min, max + 1);
+            int result = _random.Next(min, max + 1);
             return Ok(new { type = "integer", min, max, result });
         }
         //GET /randomnumber/number/decimal
@@ -57,6 +58,47 @@ namespace RandomNumbersAPI.Controllers
             }
             string result = sb.ToString();
             return Ok(new { type = "string", length, result });
+        }
+        // POST /api/randomnumber/custom
+        [HttpPost("custom")]
+        public IActionResult GetCustomRandom([FromBody] RandomRequest request)
+        {
+            if (request.Type == null)
+                return BadRequest(new { error = "Debe especificar el parámetro 'type'." });
+
+            switch (request.Type.ToLower())
+            {
+                case "number":
+                    int min = request.Min ?? 0;
+                    int max = request.Max ?? 100;
+                    if (min > max)
+                        return BadRequest(new { error = "'min' no puede ser mayor que 'max'." });
+
+                    int numberResult = _random.Next(min, max + 1);
+                    return Ok(new { result = numberResult });
+
+                case "decimal":
+                    double decimalResult = _random.NextDouble();
+                    // Redondeamos según request.Decimals
+                    decimalResult = Math.Round(decimalResult, request.Decimals);
+                    return Ok(new { result = decimalResult });
+
+                case "string":
+                    int length = request.Length;
+                    if (length < 1 || length > 1024)
+                        return BadRequest(new { error = "'length' debe estar entre 1 y 1024." });
+
+                    const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+                    var sb = new StringBuilder(length);
+                    for (int i = 0; i < length; i++)
+                        sb.Append(chars[_random.Next(chars.Length)]);
+
+                    string stringResult = sb.ToString();
+                    return Ok(new { result = stringResult });
+
+                default:
+                    return BadRequest(new { error = "El tipo debe ser 'number', 'decimal' o 'string'." });
+            }
         }
     }
 }
